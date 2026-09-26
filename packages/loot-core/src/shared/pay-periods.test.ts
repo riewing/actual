@@ -723,4 +723,32 @@ describe('Pay Period Utilities and Configuration', () => {
       }
     });
   });
+
+  describe('getCurrentPayPeriod - time of day around payday', () => {
+    const config: PayPeriodConfig = {
+      enabled: true,
+      payFrequency: 'monthly',
+      startDate: '2026-09-20',
+    };
+
+    test('evening of the last day stays in the ending period', () => {
+      // 2026-21 = 20 Sep - 19 Oct 2026
+      expect(getCurrentPayPeriod(new Date(2026, 9, 19, 18), config)).toBe(
+        '2026-21',
+      );
+      expect(
+        getCurrentPayPeriod(new Date(2026, 9, 19, 23, 59, 59), config),
+      ).toBe('2026-21');
+    });
+
+    test('morning of payday belongs to the new period', () => {
+      // 2026-22 = 20 Oct - 19 Nov 2026
+      expect(getCurrentPayPeriod(new Date(2026, 9, 20, 6), config)).toBe(
+        '2026-22',
+      );
+      expect(getCurrentPayPeriod(new Date(2026, 9, 20, 0, 0, 1), config)).toBe(
+        '2026-22',
+      );
+    });
+  });
 });

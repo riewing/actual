@@ -394,11 +394,11 @@ export function getCurrentPayPeriod(
     ...generatePayPeriods(year + 1, config),
   ];
 
+  // Compare whole days: period bounds are yyyy-MM-dd strings, while `date`
+  // may carry any time of day (e.g. `new Date()`).
+  const day = dayFromDate(date);
   for (const period of candidates) {
-    const startDate = parseDate(period.startDate);
-    const endDate = parseDate(period.endDate);
-
-    if (d.isWithinInterval(date, { start: startDate, end: endDate })) {
+    if (period.startDate <= day && day <= period.endDate) {
       return period.monthId;
     }
   }
