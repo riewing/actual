@@ -17,7 +17,7 @@ import { handleBudgetImport } from '#server/importers';
 import type { ImportableBudgetType } from '#server/importers';
 import { app as mainApp } from '#server/main-app';
 import { mutator } from '#server/mutators';
-import { loadPayPeriodConfig } from '#server/preferences/app';
+import { loadPayPeriodConfig } from '#server/preferences/pay-period-config';
 import * as prefs from '#server/prefs';
 import { getServer } from '#server/server-config';
 import * as sheet from '#server/sheet';

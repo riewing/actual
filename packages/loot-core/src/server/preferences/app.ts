@@ -8,14 +8,13 @@ import { resetFormulaPreferencesCache } from '#server/formulas/bootstrap';
 import { getDefaultDocumentDir } from '#server/main';
 import { mutator } from '#server/mutators';
 import { post } from '#server/post';
+import { loadPayPeriodConfig } from '#server/preferences/pay-period-config';
 import {
   getPrefs as _getMetadataPrefs,
   savePrefs as _saveMetadataPrefs,
 } from '#server/prefs';
 import { getServer } from '#server/server-config';
 import { undoable } from '#server/undo';
-import { setPayPeriodConfig } from '#shared/pay-periods';
-import type { PayPeriodConfig } from '#shared/pay-periods';
 import { stringToInteger } from '#shared/util';
 import type { GlobalPrefs, MetadataPrefs, SyncedPrefs } from '#types/prefs';
 
@@ -46,41 +45,6 @@ app.method('load-global-prefs', loadGlobalPrefs);
 app.method('save-prefs', saveMetadataPrefs);
 app.method('load-prefs', loadMetadataPrefs);
 app.method('save-server-prefs', saveServerPrefs);
-
-/**
- * Loads pay period configuration from synced preferences and updates the shared config.
- * This function handles validation and provides sensible defaults for invalid values.
- */
-export async function loadPayPeriodConfig(): Promise<void> {
-  const prefs = await getSyncedPrefs();
-
-  const config: PayPeriodConfig = {
-    enabled: prefs.showPayPeriods === 'true',
-    payFrequency:
-      (prefs.payPeriodFrequency as PayPeriodConfig['payFrequency']) ||
-      'monthly',
-    startDate:
-      prefs.payPeriodStartDate || new Date().toISOString().slice(0, 10),
-  };
-
-  // Validate frequency is one of the allowed values
-  const validFrequencies: PayPeriodConfig['payFrequency'][] = [
-    'weekly',
-    'biweekly',
-    'semimonthly',
-    'monthly',
-  ];
-  if (!validFrequencies.includes(config.payFrequency)) {
-    config.payFrequency = 'monthly';
-  }
-
-  // Validate startDate is a valid ISO date string
-  if (config.startDate && isNaN(Date.parse(config.startDate))) {
-    config.startDate = new Date().toISOString().slice(0, 10);
-  }
-
-  setPayPeriodConfig(config);
-}
 
 async function saveSyncedPrefs({
   id,

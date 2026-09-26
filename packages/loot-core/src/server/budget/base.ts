@@ -1,5 +1,6 @@
 import { aqlQuery } from '#server/aql';
 import * as db from '#server/db';
+import { loadPayPeriodConfig } from '#server/preferences/pay-period-config';
 import * as sheet from '#server/sheet';
 import { resolveName } from '#server/spreadsheet/util';
 // @ts-strict-ignore
@@ -381,6 +382,12 @@ export async function createBudget(months) {
 }
 
 export async function createAllBudgets() {
+  // The pay period prefs can change without passing through this backend
+  // (e.g. via sync), so refresh the config before the month range and the
+  // current month are determined. Otherwise a stale config yields calendar
+  // months while the prefs (and the UI) say pay periods, or vice versa.
+  await loadPayPeriodConfig();
+
   const earliestTransaction = await db.first<db.DbTransaction>(
     'SELECT * FROM transactions WHERE isChild=0 AND date IS NOT NULL ORDER BY date ASC LIMIT 1',
   );
