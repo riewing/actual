@@ -11,7 +11,8 @@ export type FeatureFlag =
   | 'sankeyReport'
   | 'akahuBankSync'
   | 'mobileCalculator'
-  | 'monteCarloReport';
+  | 'monteCarloReport'
+  | 'payPeriodsEnabled';
 
 /**
  * Cross-device preferences. These sync across devices when they are changed.
@@ -29,6 +30,9 @@ export type SyncedPrefs = Partial<
     | 'currencySpaceBetweenAmountAndSymbol'
     | 'defaultCurrencyCode'
     | `show-account-${string}-net-worth-chart`
+    | 'showPayPeriods'
+    | 'payPeriodFrequency'
+    | 'payPeriodStartDate'
     | `side-nav.show-balance-history-${string}`
     // @deprecated: superseded by `transaction-table-columns-${string}`; only
     // read as a fallback for budgets that never used the column manager

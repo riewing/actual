@@ -12,6 +12,7 @@ import { SchedulesProvider } from '#hooks/useCachedSchedules';
 import { useCategoryPreviewTransactions } from '#hooks/useCategoryPreviewTransactions';
 import { useDateFormat } from '#hooks/useDateFormat';
 import { useNavigate } from '#hooks/useNavigate';
+import { createMonthDateFilter } from '#hooks/usePayPeriodTranslation';
 import { useTransactions } from '#hooks/useTransactions';
 import { useTransactionsSearch } from '#hooks/useTransactionsSearch';
 import * as bindings from '#spreadsheet/bindings';
@@ -122,8 +123,5 @@ function TransactionListWithPreviews({
 }
 
 function getCategoryMonthFilter(category: CategoryEntity, month: string) {
-  return {
-    category: category.id,
-    date: { $transform: '$month', $eq: month },
-  };
+  return createMonthDateFilter(month, category.id);
 }

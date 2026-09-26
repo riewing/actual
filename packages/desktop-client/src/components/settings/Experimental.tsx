@@ -244,6 +244,9 @@ export function ExperimentalFeatures() {
             >
               <Trans>Akahu Bank Sync (NZ banks)</Trans>
             </FeatureToggle>
+            <FeatureToggle flag="payPeriodsEnabled">
+              <Trans>Pay periods</Trans>
+            </FeatureToggle>
             {showServerPrefs && (
               <ServerFeatureToggle
                 prefName="flags.plugins"

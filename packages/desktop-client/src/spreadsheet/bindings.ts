@@ -4,6 +4,7 @@ import type {
   CategoryEntity,
 } from '@actual-app/core/types/models';
 
+import { createMonthDateFilter } from '#hooks/usePayPeriodTranslation';
 import { uncategorizedTransactions } from '#queries';
 
 import { parametrizedField } from '.';
@@ -92,10 +93,7 @@ export function categoryBalance(
   return {
     name: categoryParametrizedField('balance')(categoryId),
     query: q('transactions')
-      .filter({
-        category: categoryId,
-        date: { $transform: '$month', $eq: month },
-      })
+      .filter(createMonthDateFilter(month, categoryId))
       .options({ splits: 'inline' })
       .calculate({ $sum: '$amount' }),
   } satisfies Binding<'category', 'balance'>;
@@ -109,8 +107,7 @@ export function categoryBalanceCleared(
     name: categoryParametrizedField('balanceCleared')(categoryId),
     query: q('transactions')
       .filter({
-        category: categoryId,
-        date: { $transform: '$month', $eq: month },
+        ...createMonthDateFilter(month, categoryId),
         cleared: true,
       })
       .options({ splits: 'inline' })
@@ -126,8 +123,7 @@ export function categoryBalanceUncleared(
     name: categoryParametrizedField('balanceUncleared')(categoryId),
     query: q('transactions')
       .filter({
-        category: categoryId,
-        date: { $transform: '$month', $eq: month },
+        ...createMonthDateFilter(month, categoryId),
         cleared: false,
       })
       .options({ splits: 'inline' })

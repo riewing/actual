@@ -35,7 +35,9 @@ export function getBudgetRange(start: string, end: string) {
   start = monthUtils.subMonths(start, 3);
   end = monthUtils.addMonths(end, 12);
 
-  return { start, end, range: monthUtils.rangeInclusive(start, end) };
+  const range = monthUtils.rangeInclusive(start, end);
+
+  return { start, end, range };
 }
 
 // Computes the spend total for every category in every month within the
@@ -84,8 +86,7 @@ export function createCategory(cat, sheetName, prevSheetName, start, end) {
         true,
       );
       const row = rows[0];
-      const amount = row ? row.amount : 0;
-      return amount || 0;
+      return row ? row.amount || 0 : 0;
     },
   });
 
@@ -319,13 +320,19 @@ export async function createBudget(months) {
     const sheetName = monthUtils.sheetForMonth(month);
     const prevSheetName = monthUtils.sheetForMonth(prevMonth);
     const dbMonth = parseInt(month.replace('-', ''));
+    const isPayPeriodMonth = monthUtils.isPayPeriod(month);
 
     categories.forEach(cat => {
       // Seed the spend total before creating the dynamic cell so the cell
       // skips its per-category query. Only happens on a cold build, when
       // the value hasn't been restored from cache.
+      // Pay periods (YYYY-13..YYYY-99) don't align with the calendar-month
+      // grouping of the seed query, so their cells run their own query.
       const sumCell = `sum-amount-${cat.id}`;
-      if (sheet.get().getCellValueLoose(sheetName, sumCell) == null) {
+      if (
+        !isPayPeriodMonth &&
+        sheet.get().getCellValueLoose(sheetName, sumCell) == null
+      ) {
         const name = resolveName(sheetName, sumCell);
         sheet
           .get()
