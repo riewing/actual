@@ -1,5 +1,11 @@
 // @ts-strict-ignore
-import React, { useEffect, useEffectEvent, useMemo, useState } from 'react';
+import React, {
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { ComponentType } from 'react';
 
 import { styles } from '@actual-app/components/styles';
@@ -35,6 +41,8 @@ import { useSyncedPref } from '#hooks/useSyncedPref';
 import { AutoSizingBudgetTable } from './DynamicBudgetTable';
 import * as envelopeBudget from './envelope/EnvelopeBudgetComponents';
 import { EnvelopeBudgetProvider } from './envelope/EnvelopeBudgetContext';
+import { shouldRefreshBudgetBounds } from './payPeriodBounds';
+import type { PayPeriodPrefs } from './payPeriodBounds';
 import * as trackingBudget from './tracking/TrackingBudgetComponents';
 import { TrackingBudgetProvider } from './tracking/TrackingBudgetContext';
 import { prewarmAllMonths, prewarmMonth } from './util';
@@ -140,27 +148,27 @@ export function Budget() {
     initialized,
   ]);
 
-  // Refresh budget bounds when pay period config changes or when toggling pay periods on
+  // Refresh budget bounds when pay periods are toggled (either way) or their
+  // config changes while enabled. get-budget-bounds also makes the backend
+  // reload its pay period config, which may otherwise be stale after sync.
+  const lastPayPeriodPrefs = useRef<PayPeriodPrefs | null>(null);
   useEffect(() => {
-    // Skip if feature flag is disabled
-    if (!payPeriodFeatureFlagEnabled) {
+    // Skip if feature flag is disabled, and until the initial load (which
+    // fetches the bounds itself) is done
+    if (!payPeriodFeatureFlagEnabled || !initialized) {
+      lastPayPeriodPrefs.current = null;
       return;
     }
 
-    // Skip initial mount - only trigger on actual changes
-    const isInitialMount = !initialized;
-    if (isInitialMount) {
-      return;
-    }
+    const next: PayPeriodPrefs = {
+      showPayPeriods: payPeriodViewEnabled,
+      payPeriodFrequency,
+      payPeriodStartDate,
+    };
+    const prev = lastPayPeriodPrefs.current;
+    lastPayPeriodPrefs.current = next;
 
-    // Determine if we should refresh:
-    // 1. Toggling pay periods on (to ensure pay period sheets exist)
-    // 2. Config changes while pay periods are enabled (frequency or start date)
-    const shouldRefresh =
-      payPeriodViewEnabled === 'true' &&
-      (payPeriodFrequency || payPeriodStartDate);
-
-    if (shouldRefresh) {
+    if (shouldRefreshBudgetBounds(prev, next)) {
       void send('get-budget-bounds').then(({ start, end }) => {
         setBounds({ start, end });
       });
