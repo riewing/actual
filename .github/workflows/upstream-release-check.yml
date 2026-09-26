@@ -1,0 +1,76 @@
+name: Upstream release check
+
+# Signaleert een nieuwe upstream-release van actualbudget/actual: opent een issue zodat de
+# maandelijkse rebase (PERIODS.md, periods/update.sh) niet stil blijft liggen bij een nieuwe
+# versie of securityfix. Draait nooit op een tag-push (dat is het domein van periods-image.yml).
+on:
+  schedule:
+    - cron: '0 6 * * 1' # elke maandag 06:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Bepaal de upstream-basis van de periods-stapel
+        id: basis
+        run: |
+          set -euo pipefail
+          # Bron van waarheid: de nieuwste v*-periods.* tag (geen -rc), zoals ook
+          # periods/update.sh en tools/actual-probe/setup.sh die lezen. Geen aparte
+          # UPSTREAM_VERSION-regel om uit sync te laten lopen.
+          TAG="$(git tag -l 'v*-periods.*' | grep -v -- '-rc' | sort -V | tail -1)"
+          if [ -z "$TAG" ]; then
+            echo "FOUT: geen v*-periods.* tag gevonden op deze checkout." >&2
+            exit 1
+          fi
+          BASIS="${TAG%%-periods.*}"
+          echo "Stapel gebaseerd op upstream $BASIS (tag $TAG)"
+          echo "basis=$BASIS" >> "$GITHUB_OUTPUT"
+
+      - name: Haal de nieuwste upstream-release op
+        id: upstream
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          NIEUW="$(gh api repos/actualbudget/actual/releases/latest --jq .tag_name)"
+          if [ -z "$NIEUW" ]; then
+            echo "FOUT: kon de nieuwste upstream-release niet ophalen." >&2
+            exit 1
+          fi
+          echo "Nieuwste upstream-release: $NIEUW"
+          echo "nieuw=$NIEUW" >> "$GITHUB_OUTPUT"
+
+      - name: Vergelijk en open eventueel een issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASIS: ${{ steps.basis.outputs.basis }}
+          NIEUW: ${{ steps.upstream.outputs.nieuw }}
+        run: |
+          set -euo pipefail
+          NIEUWSTE="$(printf '%s\n%s\n' "$BASIS" "$NIEUW" | sort -V | tail -1)"
+          if [ "$NIEUWSTE" = "$BASIS" ]; then
+            echo "Geen nieuwere upstream-release (basis $BASIS, upstream $NIEUW)."
+            exit 0
+          fi
+
+          TITEL="Upstream-release $NIEUW beschikbaar — periods-stapel rebasen"
+          BESTAAND="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --json title \
+            --jq ".[] | select(.title == \"$TITEL\") | .title")"
+          if [ -n "$BESTAAND" ]; then
+            echo "Issue bestaat al: $TITEL"
+            exit 0
+          fi
+
+          BODY="$(printf 'Upstream `actualbudget/actual` heeft release `%s`. Deze fork-stapel (`periods`) is nu gebaseerd op `%s`.\n\nVolg de maandelijkse update in [PERIODS.md](../blob/periods/PERIODS.md) (`periods/update.sh`) voor de rebase. Lees eerst de release notes / security-advisories van `%s` upstream.\n' "$NIEUW" "$BASIS" "$NIEUW")"
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITEL" --body "$BODY"
