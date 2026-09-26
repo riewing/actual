@@ -38,3 +38,26 @@ git tag vNIEUW-periods.1-rc.1 && git push origin vNIEUW-periods.1-rc.1
 Daarna de scenariotest (eisen 1–9 uit de spec) tegen de rc-image. Pas als die
 groen is: tag `vNIEUW-periods.1` en de image-regel in
 `k3s-homelab/services/budget/budget.yml` bijwerken.
+
+### Scenariotest vóór de definitieve tag
+
+Draai vóór het taggen van `vNIEUW-periods.1` de scenariotest tegen de rc-image,
+met een verse export uit productie (_Settings → Export data_):
+
+```bash
+periods/scenario/run.sh <export-zip> ghcr.io/riewing/actual-server:<rc-tag>
+```
+
+Het script start een verse fork-container en een verse standaardcontainer
+(`actual-server:26.9.0-alpine`) op een eigen docker-netwerk, draait Playwright
+in `mcr.microsoft.com/playwright:v1.61.1-noble` en ruimt alles na afloop op.
+De zip wordt alleen-lezen gemount. De uitvoer (`results.md`, `results.json`,
+schermafdrukken bij een fout) komt in `$SCENARIO_OUT`, anders in een nieuwe
+map onder `$TMPDIR`, altijd buiten de repo. Commit geen export, uitvoer of
+schermafdrukken. De exitcode is 0 als alle eisen PASS zijn. FAIL is een
+productfout. UNVERIFIED betekent dat het script de eis niet kon toetsen.
+
+Zet bij een nieuwe upstream-versie `STOCK_IMAGE` op de bijbehorende standaardimage
+(bv. `STOCK_IMAGE=actualbudget/actual-server:<NIEUW>-alpine`); de default is
+`26.9.0-alpine`. Houd de Playwright-image gelijk aan de versie van `@playwright/test` in
+`packages/desktop-client/package.json`.
