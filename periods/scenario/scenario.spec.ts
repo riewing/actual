@@ -1,4 +1,4 @@
-// Scenariotest budgetperiodes (eisen 1-9 uit de spec), zie run.sh.
+// Scenariotest budgetperiodes (eisen 1-9 uit de spec, plus eis 10), zie run.sh.
 // Draait tegen wegwerpcontainers met een echte export. Privacy: de uitvoer
 // bevat alleen oordelen per eis, labels en totalen; geen begunstigden,
 // notities of losse transacties.
@@ -278,6 +278,37 @@ async function signInAndImport(browser: Browser, url: string, zip: string) {
   return { page, budgetPage, pageErrors };
 }
 
+/**
+ * Een tweede, verse client (lege opslag): inloggen en het budget openen via
+ * de serverlijst, zodat het gedownload wordt inclusief gesyncte prefs.
+ */
+async function openFromServer(browser: Browser, url: string) {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const pageErrors: string[] = [];
+  page.on('pageerror', e => pageErrors.push(e.message.slice(0, 200)));
+  await page.goto(url);
+  await page.getByPlaceholder('Password').fill(PASSWORD);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  const files = page.getByRole('grid', { name: 'Budget files' });
+  await expect(files.getByRole('row')).toHaveCount(1, { timeout: 30_000 });
+  await files.getByRole('row').first().click();
+  await new BudgetPage(page).waitFor({ timeout: 120_000 });
+  await dismissTour(page);
+  return { context, page, pageErrors };
+}
+
+async function uiIncome(page: Page) {
+  // Eerste 'received'-cel in de tabel = totaalrij van de inkomsten.
+  return parseAmount(
+    await page
+      .getByTestId('budget-table')
+      .getByTestId('received')
+      .first()
+      .innerText(),
+  );
+}
+
 async function dismissTour(page: Page) {
   const tour = page.getByText('Welcome to Actual!');
   await tour.waitFor({ timeout: 5000 }).catch(() => undefined);
@@ -440,10 +471,11 @@ const TITLES: Record<number, string> = {
   7: '#template en Hold in de periodeweergave',
   8: 'Maandweergave laat kalenderdata intact',
   9: 'Export opent in standaard Actual (STOCK_IMAGE)',
+  10: 'Verse client ziet de periodes na download van de server',
 };
 
 function writeReport() {
-  for (let req = 1; req <= 9; req++) {
+  for (let req = 1; req <= 10; req++) {
     if (!results.some(r => r.req === req)) {
       results.push({
         req,
@@ -624,6 +656,74 @@ test('scenariotest budgetperiodes', async ({ browser }) => {
         Math.abs(toBudgetUi + balanceUi - atEnd.sum) <= 1,
         `To Budget + saldi = ${euro(toBudgetUi + balanceUi)}, rekeningen = ${euro(atEnd.sum)}`,
       );
+    },
+  );
+
+  // --- eis 10: verse client ziet de periodes (vóór alle testmutaties) ---
+  await check(
+    null,
+    10,
+    'Verse client ziet de periodes na download van de server',
+    async obs => {
+      const ref = await sheet(page, P1.id);
+      const refUi = await uiIncome(page);
+      // Prefs (vlag, frequentie, startdatum, weergave) naar de server.
+      await send(page, 'sync');
+      const fresh = await openFromServer(browser, FORK_URL);
+      const fp = fresh.page;
+      try {
+        const freshBounds = await send<{ start: string; end: string }>(
+          fp,
+          'get-budget-bounds',
+        );
+        const freshSelected = await selectedMonth(fp);
+        const fs = await sheet(fp, P1.id);
+        obs.refIncomeP1 = euro(ref['total-income']);
+        obs.refIncomeP1Ui = euro(refUi);
+        obs.freshBounds = `${freshBounds.start}..${freshBounds.end}`;
+        obs.freshSelectedMonth = freshSelected;
+        obs.freshIncomeP1Sheet = euro(fs['total-income']);
+        obs.freshSpentP1Sheet = euro(fs['total-spent']);
+        let freshUi: number | null = null;
+        if (PERIOD_ID.test(freshSelected)) {
+          await gotoMonth(fp, P1.id);
+          freshUi = await uiIncome(fp);
+        }
+        obs.freshIncomeP1Ui = euro(freshUi);
+        obs.freshPageErrors = fresh.pageErrors.length;
+        requireThat(
+          refUi === ref['total-income'] && ref['total-income'] !== 0,
+          'referentie-inkomsten in de eerste client zijn 0 of wijken af',
+        );
+        requireThat(
+          PERIOD_ID.test(freshBounds.end),
+          `verse client: budgetbereik eindigt op ${freshBounds.end}, geen periode-ID`,
+        );
+        requireThat(
+          PERIOD_ID.test(freshSelected),
+          `verse client: geselecteerd ${freshSelected}, geen periode`,
+        );
+        requireThat(
+          fs['total-income'] === ref['total-income'],
+          `verse client: inkomsten ${P1.id} ${euro(fs['total-income'])}, verwacht ${euro(ref['total-income'])}`,
+        );
+        requireThat(
+          fs['total-spent'] === ref['total-spent'],
+          `verse client: besteed ${P1.id} ${euro(fs['total-spent'])}, verwacht ${euro(ref['total-spent'])}`,
+        );
+        requireThat(
+          freshUi === ref['total-income'],
+          `verse client: UI-inkomsten ${euro(freshUi)}, verwacht ${euro(ref['total-income'])}`,
+        );
+      } catch (e) {
+        mkdirSync(`${OUT}/failures`, { recursive: true });
+        await fp
+          .screenshot({ path: `${OUT}/failures/eis-10.png`, fullPage: true })
+          .catch(() => undefined);
+        throw e;
+      } finally {
+        await fresh.context.close();
+      }
     },
   );
 

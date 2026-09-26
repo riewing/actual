@@ -35,7 +35,7 @@ git push -f origin periods
 git tag vNIEUW-periods.1-rc.1 && git push origin vNIEUW-periods.1-rc.1
 ```
 
-Daarna de scenariotest (eisen 1–9 uit de spec) tegen de rc-image. Pas als die
+Daarna de scenariotest (eisen 1–9 uit de spec, plus eis 10: verse client) tegen de rc-image. Pas als die
 groen is: tag `vNIEUW-periods.1` en de image-regel in
 `k3s-homelab/services/budget/budget.yml` bijwerken.
 

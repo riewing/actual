@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenariotest (eisen 1-9 uit de spec) tegen een echte budget-export.
+# Scenariotest (eisen 1-10) tegen een echte budget-export.
 # Start per run een verse fork-container en een verse standaardcontainer op
 # een eigen docker-netwerk, en draait Playwright in een container ernaast.
 # Alles wordt na afloop opgeruimd, ook bij een fout of Ctrl-C.
